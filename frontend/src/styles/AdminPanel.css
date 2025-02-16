@@ -1,0 +1,258 @@
+/* Center the entire page */
+.admin-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  max-width: 600px;
+  margin: auto;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  border-radius: 10px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Form elements */
+.admin-container input[type="text"] {
+  width: 100%;
+  padding: 12px;
+  margin: 5px 0;
+  border: 2px solid #888; /* Darker border for visibility */
+  border-radius: 6px;
+  font-size: 20px; /* Increased font size */
+  background-color: #fff;
+}
+
+.admin-container input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+/* Option container layout */
+.option-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.option-container input[type="text"] {
+  flex: 1;
+  padding: 12px;
+  font-size: 20px; /* Bigger font */
+  border: 2px solid #555;
+  border-radius: 6px;
+  background-color: #fff;
+  min-width: 250px; /* Minimum width for better alignment */
+}
+/* Radio and checkbox alignment */
+.option-container input[type="radio"],
+.option-container input[type="checkbox"] {
+  margin-left: 10px;
+}
+
+/* Delete button (❌) */
+.option-container button {
+  background: red;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  margin-left: 5px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* Button group styling */
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+/* General button styles */
+button {
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+/* Different button colors */
+.add-btn { background: #4CAF50; color: white; }
+.delete-btn { background: red; color: white; }
+.start-btn { background: #008CBA; color: white; }
+
+/* Existing questions section */
+.existing-questions {
+  margin-top: 20px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* Question card styling */
+.question-card {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin: 10px 0;
+  background: white;
+  border-radius: 5px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+/* Image styling */
+.question-card img {
+  max-width: 100%;
+  height: auto;
+  margin-top: 5px;
+  border-radius: 5px;
+}
+.question-image {
+  max-width: 200px;
+  height: auto;
+  display: block;
+  margin: 10px auto;
+  border-radius: 8px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.json-input-container {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.json-textarea {
+  width: 100%;
+  height: 120px;
+  padding: 10px;
+  font-size: 16px;
+  border: 2px solid #aaa;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.json-btn {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+/* Ensure questions are centered */
+.existing-questions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Ensure question container is centered */
+.question-card {
+  border: 1px solid gray;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background: #f9f9f9;
+  text-align: center;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Center question text */
+.question-card p {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+/* Style for multiple choice toggle */
+.multiple-choice-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Update the question options list styling */
+.question-options {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+  margin: 10px 0;
+}
+
+/* Update individual option styling */
+.question-options li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 15px;
+  padding: 8px;
+  margin: 4px 0;
+  background-color: #f8f8f8;
+  border-radius: 4px;
+}
+
+/* Style for the answer text */
+.question-options span {
+  text-align: left;
+  font-size: 16px;
+  padding-right: 10px;
+}
+
+/* Style for checkboxes/radio buttons */
+.question-options input[type="radio"],
+.question-options input[type="checkbox"] {
+  margin: 0;
+  transform: scale(1.2);
+}
+
+/* Ensure the question card content is properly aligned */
+.question-card {
+  text-align: left;
+  padding: 20px;
+}
+
+/* Style for the multiple choice toggle in question card */
+.question-card label {
+  display: block;
+  margin: 10px 0;
+}
+
+/* Ensure proper multiple-choice toggle alignment */
+.multiple-choice-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+/* Remove Question Button */
+.delete-btn {
+  background: red;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 10px;
+}
+
+.delete-btn:hover {
+  background: darkred;
+}

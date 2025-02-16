@@ -1,0 +1,26 @@
+.game-screen-container {
+  text-align: center;
+  margin-top: 10vh;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  margin: 10px 0;
+}
+
+.submit-btn {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+}
+
+.feedback {
+  font-size: 20px;
+  margin-top: 10px;
+}

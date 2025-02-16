@@ -1,0 +1,17 @@
+{
+  "name": "dvd_game_backend",
+  "version": "1.0.0",
+  "description": "Backend for Kahoot-style game",
+  "main": "server.js",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "ws": "^8.13.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

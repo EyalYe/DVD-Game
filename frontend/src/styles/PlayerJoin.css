@@ -1,0 +1,19 @@
+.player-join-container {
+  text-align: center;
+  margin-top: 20vh;
+}
+
+input {
+  padding: 10px;
+  font-size: 16px;
+  margin-bottom: 10px;
+  width: 80%;
+}
+
+.join-btn {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+}
