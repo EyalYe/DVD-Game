@@ -24,3 +24,17 @@ li {
   font-size: 20px;
   margin-top: 10px;
 }
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.selected {
+  background-color: #4caf50;
+  color: white;
+}
+.time-left {
+  margin-top: 10px;
+  font-size: 1.2rem;
+}
