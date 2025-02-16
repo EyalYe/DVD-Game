@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
 const GameScreen = () => {
-    const [name, setName] = useState(localStorage.getItem("playerName") || "");
-    const [joined, setJoined] = useState(!!localStorage.getItem("playerName"));
+    const [name, setName] = useState(() => sessionStorage.getItem("playerName") || "");
+    const [joined, setJoined] = useState(!!sessionStorage.getItem("playerName"));
     const [players, setPlayers] = useState([]);
     const [leaderId, setLeaderId] = useState(null);
     const [isLeader, setIsLeader] = useState(false);
@@ -18,77 +18,74 @@ const GameScreen = () => {
     const MAX_RECONNECT_ATTEMPTS = 5;
 
     const connectWebSocket = () => {
-        try {
-            if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-                setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
-                return;
+        if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+            setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
+            return;
+        }
+
+        setConnectionStatus("connecting");
+        console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
+
+        const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
+
+        ws.onopen = () => {
+            console.log("Connected to WebSocket - Ready State:", ws.readyState);
+            setConnectionStatus("connected");
+            setErrorMessage("");
+            reconnectAttemptsRef.current = 0;
+
+            if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
+                console.log("Rejoining with existing player ID:", playerIdRef.current);
+                sessionStorage.setItem("hasJoined", "true"); // Prevent duplicate joins
+                ws.send(JSON.stringify({ type: "join", name, playerId: playerIdRef.current }));
+            }
+            ws.send(JSON.stringify({ type: "requestGameState" }));
+        };
+
+        ws.onmessage = (message) => {
+            const data = JSON.parse(message.data);
+            console.log("Received WebSocket message:", data);
+
+            if (data.type === "updatePlayers") {
+                setPlayers(data.players);
+                setLeaderId(data.leaderId);
+                setIsLeader(playerIdRef.current === data.leaderId);
             }
 
-            setConnectionStatus("connecting");
-            console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-            
-            const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
-            
-            ws.onopen = () => {
-                console.log("Connected to WebSocket - Ready State:", ws.readyState);
-                setConnectionStatus("connected");
-                setErrorMessage("");
-                reconnectAttemptsRef.current = 0;
-                
-                if (joined && playerIdRef.current) {
-                    console.log("Rejoining with existing player ID:", playerIdRef.current);
-                    ws.send(JSON.stringify({ 
-                        type: "join", 
-                        name, 
-                        playerId: playerIdRef.current 
-                    }));
-                }
-                ws.send(JSON.stringify({ type: "requestGameState" }));
-            };
+            if (data.type === "gameStatus") {
+                setGameRunning(data.running);
+            }
+        };
 
-            ws.onmessage = (message) => {
-                const data = JSON.parse(message.data);
-                console.log("Received WebSocket message:", data);
+        ws.onclose = (event) => {
+            console.warn("WebSocket closed. Code:", event.code, "Reason:", event.reason);
+            setConnectionStatus("disconnected");
 
-                if (data.type === "updatePlayers") {
-                    setPlayers(data.players);
-                    setLeaderId(data.leaderId);
-                    setIsLeader(playerIdRef.current === data.leaderId);
-                }
+            if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttemptsRef.current += 1;
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    console.log("Attempting to reconnect...");
+                    connectWebSocket();
+                }, 2000);
+            }
+        };
 
-                if (data.type === "gameStatus") {
-                    setGameRunning(data.running);
-                }
-            };
-
-            ws.onclose = (event) => {
-                console.warn("WebSocket closed. Code:", event.code, "Reason:", event.reason);
-                setConnectionStatus("disconnected");
-                
-                if (socketRef.current) {
-                    reconnectAttemptsRef.current += 1;
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        console.log("Attempting to reconnect...");
-                        connectWebSocket();
-                    }, 2000);
-                }
-            };
-
-            ws.onerror = (error) => {
-                console.error("WebSocket error:", error);
-                setErrorMessage("Failed to connect to game server. Please check if the server is running.");
-                setConnectionStatus("error");
-            };
-
-            socketRef.current = ws;
-        } catch (error) {
-            console.error("Error creating WebSocket:", error);
-            setErrorMessage(`Connection error: ${error.message}`);
+        ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            setErrorMessage("Failed to connect to game server. Please check if the server is running.");
             setConnectionStatus("error");
-        }
+        };
+
+        socketRef.current = ws;
     };
 
     useEffect(() => {
+        if (!sessionStorage.getItem("sessionStarted")) {
+            sessionStorage.setItem("sessionStarted", "true");
+            sessionStorage.removeItem("playerName");
+            sessionStorage.removeItem("hasJoined");
+        }
+
         connectWebSocket();
 
         return () => {
@@ -107,6 +104,23 @@ const GameScreen = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (joined && connectionStatus === "connected" && !sessionStorage.getItem("hasJoined")) {
+            console.log("Auto-joining game after connection...");
+            sessionStorage.setItem("hasJoined", "true"); // Prevent duplicate joins
+            joinGame();
+        }
+    }, [joined, connectionStatus]);
+
+    const startGame = () => {
+        if (isLeader && socketRef.current?.readyState === WebSocket.OPEN) {
+            console.log("Starting game...");
+            socketRef.current.send(JSON.stringify({ type: "startGame", timeLimit }));
+        } else {
+            console.warn("Cannot start game. Either not the leader or WebSocket is not open.");
+        }
+    };
+
     const joinGame = () => {
         if (!name.trim()) {
             setErrorMessage("Please enter a name");
@@ -115,20 +129,26 @@ const GameScreen = () => {
 
         if (connectionStatus !== "connected") {
             setErrorMessage("Not connected to server. Please wait for connection.");
+            console.log("Not connected to server. Please wait for connection.");
+            return;
+        }
+
+        if (joined) {
+            console.warn("Already joined, skipping duplicate join request.");
             return;
         }
 
         console.log("Join game initiated for name:", name);
-        localStorage.setItem("playerName", name);
+        sessionStorage.setItem("playerName", name);
         setJoined(true);
         playerIdRef.current = name + "_" + Math.random().toString(36).substr(2, 9);
         console.log("Generated player ID:", playerIdRef.current);
 
         if (socketRef.current?.readyState === WebSocket.OPEN) {
-            const joinMessage = { 
-                type: "join", 
-                name, 
-                playerId: playerIdRef.current 
+            const joinMessage = {
+                type: "join",
+                name,
+                playerId: playerIdRef.current,
             };
             console.log("Sending join message:", joinMessage);
             socketRef.current.send(JSON.stringify(joinMessage));
@@ -139,28 +159,11 @@ const GameScreen = () => {
         }
     };
 
-    // Render connection status
-    const renderConnectionStatus = () => {
-        switch (connectionStatus) {
-            case "connected":
-                return <div className="text-green-600">Connected to server</div>;
-            case "connecting":
-                return <div className="text-yellow-600">Connecting to server...</div>;
-            case "disconnected":
-                return <div className="text-red-600">Disconnected from server</div>;
-            case "error":
-                return <div className="text-red-600">Connection error</div>;
-            default:
-                return null;
-        }
-    };
-
     return (
         <div className="game-container">
-            {renderConnectionStatus()}
-            {errorMessage && (
-                <div className="text-red-600 mt-2">{errorMessage}</div>
-            )}
+            {connectionStatus === "connected" && <div className="text-green-600">Connected to server</div>}
+            {errorMessage && <div className="text-red-600 mt-2">{errorMessage}</div>}
+
             {!joined ? (
                 <div className="join-screen">
                     <h2>Join the Game</h2>

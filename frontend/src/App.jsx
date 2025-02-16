@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import AdminPanel from "./components/AdminPanel";
-import PlayerJoin from "./components/PlayerJoin";
 import GameScreen from "./components/GameScreen";
 import "./styles/App.css";
 
 function App() {
   const [role, setRole] = useState(null);
-  const [playerName, setPlayerName] = useState("");
+  const [playerName, setPlayerName] = useState(() => sessionStorage.getItem("playerName") || "");
 
   useEffect(() => {
     if (window.location.pathname === "/admin") {
@@ -28,7 +27,7 @@ function App() {
   return (
     <div className="app-container">
       {role === "admin" && <AdminPanel onStartGame={handleStartGame} />}
-      {role === "player" && (playerName ? <GameScreen playerName={playerName} /> : <PlayerJoin onJoin={(name) => setPlayerName(name)} />)}
+      {role === "player" && <GameScreen />}
     </div>
   );
 }
