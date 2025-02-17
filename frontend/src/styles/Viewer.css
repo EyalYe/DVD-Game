@@ -1,0 +1,93 @@
+/* Viewer.css */
+
+.viewer-container {
+  max-width: 1000px; /* Wider container for desktop */
+  margin: 0 auto;
+  padding: 40px;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.viewer-section {
+  border: 1px solid #ddd;
+  background-color: #f9f9f9;
+  padding: 30px;
+  margin: 20px auto;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.viewer-title {
+  font-size: 2em;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.viewer-question {
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  color: #444;
+}
+
+.viewer-options {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.viewer-option {
+  background-color: #e0e0e0;
+  margin: 5px;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.viewer-timer {
+  font-size: 1.2em;
+  color: #666;
+  margin-top: 20px;
+}
+
+.viewer-leaderboard {
+  list-style: none;
+  padding: 0;
+  margin: 20px auto;
+  max-width: 400px;
+  text-align: left;
+}
+
+.viewer-leaderboard-item {
+  background-color: #fff;
+  padding: 10px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid #ddd;
+  font-size: 1.2em;
+}
+
+.viewer-answer {
+  margin-top: 30px;
+}
+
+.viewer-correct {
+  font-size: 1.5em;
+  color: #2a7;
+}
+
+.viewer-connection-status {
+  font-size: 1em;
+  color: orange;
+}
+
+.viewer-error {
+  font-size: 1em;
+  color: red;
+}
+
+.viewer-waiting {
+  font-size: 1.5em;
+  color: #555;
+}

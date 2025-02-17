@@ -38,12 +38,25 @@ const GameScreen = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [correctAnswers, setCorrectAnswers] = useState([]);
 
+  // Flash color state for answer feedback ("green", "red", or null)
+  const [flashColor, setFlashColor] = useState(null);
+
   // Refs
   const socketRef = useRef(null);
   const playerIdRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
+
+  // Clear flash effect after a short time
+  useEffect(() => {
+    if (flashColor) {
+      const timeout = setTimeout(() => {
+        setFlashColor(null);
+      }, 500); // flash duration in ms
+      return () => clearTimeout(timeout);
+    }
+  }, [flashColor]);
 
   // On mount, load stored playerId
   useEffect(() => {
@@ -90,18 +103,14 @@ const GameScreen = () => {
         setIsLeader(playerIdRef.current === data.leaderId);
       }
       else if (data.type === "gameStatus") {
-        // If running is false => phase = LOBBY, else => might be QUESTION or LEADERBOARD
         if (!data.running) {
           setPhase(PHASES.LOBBY);
         } else {
-          // We can't be sure if it's QUESTION or LEADERBOARD yet, we'll see "newQuestion" or "leaderboard" soon
-          // But let's default to QUESTION for now.
           setPhase(PHASES.QUESTION);
         }
         setTimeLimit(data.timeLimit || 30);
       }
       else if (data.type === "newQuestion") {
-        // Switch to question phase
         setPhase(PHASES.QUESTION);
         setCurrentQuestion(data.question);
         setOptions(data.options);
@@ -111,24 +120,23 @@ const GameScreen = () => {
         setTimeLeft(timeLimit);
       }
       else if (data.type === "leaderboard") {
-        // Switch to leaderboard phase
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
-        setCorrectAnswers(data.correctIndexes);
-        setCurrentQuestion(null);
+        setCurrentQuestion(data.question); // Store original question text
+        setCorrectAnswers(data.correctAnswers); // Use full-text correct answers
         setTimeLeft(null);
       }
       else if (data.type === "timeUpdate") {
         setTimeLeft(data.timeLeft);
       }
       else if (data.type === "gameOver") {
-        // Switch to over phase
         setPhase(PHASES.OVER);
         setLeaderboard(data.leaderboard);
       }
       else if (data.type === "answerResult") {
-        // Just handle the local result if you want to display correctness or updated score
         console.log(`Answer result: correct=${data.correct}, newScore=${data.score}`);
+        // Flash green for correct, red for incorrect
+        setFlashColor(data.correct ? "green" : "red");
       }
     };
 
@@ -225,7 +233,6 @@ const GameScreen = () => {
 
   // Return to lobby without reloading
   const returnToLobby = () => {
-    // We'll treat "return to lobby" as resetting to LOBBY phase
     console.log("Returning to lobby...");
     setPhase(PHASES.LOBBY);
     setCurrentQuestion(null);
@@ -234,7 +241,6 @@ const GameScreen = () => {
     setSelectedAnswer([]);
     setAnswerSubmitted(false);
     setTimeLeft(null);
-    // Optionally request fresh game state
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: "requestGameState" }));
     }
@@ -384,9 +390,13 @@ const GameScreen = () => {
             <h3>Leaderboard</h3>
             <ul>
               {leaderboard.map(entry => (
-                <li key={entry.id}>{entry.id}: {entry.score}</li>
+                <li key={entry.id}>
+                  {entry.id}: {entry.score}
+                </li>
               ))}
             </ul>
+            {/* Display original question and correct answers */}
+            <h4>Question: {currentQuestion}</h4>
             <h4>Correct Answer: {correctAnswers.join(", ")}</h4>
             {isLeader && (
               <button onClick={continueToNext}>
@@ -406,7 +416,9 @@ const GameScreen = () => {
           <h3>Final Leaderboard:</h3>
           <ul>
             {leaderboard.map(entry => (
-              <li key={entry.id}>{entry.id}: {entry.score}</li>
+              <li key={entry.id}>
+                {entry.id}: {entry.score}
+              </li>
             ))}
           </ul>
           <button onClick={returnToLobby}>Return to Lobby</button>
@@ -419,7 +431,7 @@ const GameScreen = () => {
   };
 
   return (
-    <div className="game-container">
+    <div className={`game-container ${flashColor ? `flash-${flashColor}` : ""}`}>
       {connectionStatus === "connected" && <div className="text-green-600">Connected to server</div>}
       {errorMessage && <div className="text-red-600 mt-2">{errorMessage}</div>}
       {renderContent()}

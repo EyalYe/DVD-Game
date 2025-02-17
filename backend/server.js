@@ -125,7 +125,7 @@ wss.on("connection", (ws, req) => {
                     clearTimeout(currentQuestionTimeout);
                     clearInterval(timeUpdateInterval);
                     timeUpdateInterval = null;
-                    showLeaderboard(currentQuestionData.correctIndexes);
+                    showLeaderboard(currentQuestionData.correctIndexes, currentQuestionData);
                 } else if (phase === "leaderboard") {
                     // Move on to the next question
                     serveNextQuestion();
@@ -178,7 +178,7 @@ wss.on("connection", (ws, req) => {
                     clearTimeout(currentQuestionTimeout);
                     clearInterval(timeUpdateInterval);
                     timeUpdateInterval = null;
-                    showLeaderboard(currentQuestionData.correctIndexes);
+                    showLeaderboard(currentQuestionData.correctIndexes, currentQuestionData);
                 }
             }
         } catch (err) {
@@ -238,9 +238,9 @@ function sendCurrentState(ws) {
             options: currentQuestionData.options,
             isMultipleChoice: currentQuestionData.isMultipleChoice
         }));
-    } else if (phase === "leaderboard" && questionEnded && !gameOver) {
+    } else if (phase === "leaderboard" && questionEnded && typeof gameOver === "undefined") {
         // We are in the leaderboard phase
-        // Send them the scoreboard so they see the current results
+        // Send them the scoreboard along with the question and correct answers
         const leaderboardData = Array.from(players.values()).map(player => ({
             id: player.id,
             score: playerScores.get(player.id) || 0
@@ -248,7 +248,10 @@ function sendCurrentState(ws) {
         ws.send(JSON.stringify({
             type: "leaderboard",
             scores: leaderboardData,
-            correctIndexes: currentQuestionData ? currentQuestionData.correctIndexes : []
+            question: currentQuestionData ? currentQuestionData.question : "",
+            correctAnswers: currentQuestionData
+                ? currentQuestionData.correctIndexes.map(idx => currentQuestionData.options[idx])
+                : []
         }));
     } else if (phase === "over") {
         // The game is over
@@ -377,7 +380,8 @@ function serveNextQuestion() {
             questionEnded = true;
             clearInterval(timeUpdateInterval);
             timeUpdateInterval = null;
-            showLeaderboard(question.correctIndexes);
+            // Pass the full question data to showLeaderboard
+            showLeaderboard(question.correctIndexes, question);
         }
     }, questionTimeLimit * 1000);
 }
@@ -385,7 +389,7 @@ function serveNextQuestion() {
 // ─────────────────────────────────────────────────────────────────────────
 // showLeaderboard
 // ─────────────────────────────────────────────────────────────────────────
-function showLeaderboard(correctIndexes) {
+function showLeaderboard(correctIndexes, question) {
     console.log("Displaying leaderboard...");
     phase = "leaderboard";
 
@@ -394,10 +398,14 @@ function showLeaderboard(correctIndexes) {
         score: playerScores.get(player.id) || 0
     }));
 
+    // Map the correct indexes to their corresponding answer text
+    const correctAnswers = correctIndexes.map(index => question.options[index]);
+
     broadcast({
         type: "leaderboard",
         scores: board,
-        correctIndexes
+        question: question.question, // Include original question text
+        correctAnswers              // Include full-text correct answers
     });
 
     // Optionally reset scores every 10 questions

@@ -1,21 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import AdminPanel from "./components/AdminPanel";
 import GameScreen from "./components/GameScreen";
+import Viewer from "./components/Viewer"; // Import your Viewer component
 import "./styles/App.css";
 
 function App() {
-  const [role, setRole] = useState(null);
-  const [playerName, setPlayerName] = useState(() => sessionStorage.getItem("playerName") || "");
-
-  useEffect(() => {
-    if (window.location.pathname === "/admin") {
-      setRole("admin");
-    } else {
-      setRole("player");
-    }
-  }, []);
-
   const handleStartGame = async () => {
     try {
       await fetch("http://localhost:3000/start-game", { method: "POST" });
@@ -25,10 +15,15 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      {role === "admin" && <AdminPanel onStartGame={handleStartGame} />}
-      {role === "player" && <GameScreen />}
-    </div>
+    <Router>
+      <div className="app-container">
+        <Routes>
+          <Route path="/admin" element={<AdminPanel onStartGame={handleStartGame} />} />
+          <Route path="/view" element={<Viewer />} />
+          <Route path="/" element={<GameScreen />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 

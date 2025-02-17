@@ -38,3 +38,21 @@ li {
   margin-top: 10px;
   font-size: 1.2rem;
 }
+
+.flash-green {
+  animation: flashGreen 2s;
+}
+
+.flash-red {
+  animation: flashRed 2s;
+}
+
+@keyframes flashGreen {
+  from { background-color: rgba(0, 255, 0, 0.5); }
+  to { background-color: transparent; }
+}
+
+@keyframes flashRed {
+  from { background-color: rgba(255, 0, 0, 0.5); }
+  to { background-color: transparent; }
+}
