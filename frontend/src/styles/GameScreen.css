@@ -56,3 +56,24 @@ li {
   from { background-color: rgba(255, 0, 0, 0.5); }
   to { background-color: transparent; }
 }
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selected {
+  background-color: #4caf50;
+  color: white;
+}
+
+.time-left {
+  margin-top: 10px;
+  font-size: 1.2rem;
+}
+
+.question-image {
+  max-width: 100%;
+  margin-bottom: 15px;
+}
