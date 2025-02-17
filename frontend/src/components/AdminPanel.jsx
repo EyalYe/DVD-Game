@@ -11,10 +11,11 @@ const AdminPanel = ({ onStartGame }) => {
   const [isMultipleChoice, setIsMultipleChoice] = useState(false);
   const [image, setImage] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const ip = "http://localhost:3000";
 
   // Fetch questions from the backend
   const fetchQuestions = () => {
-    fetch("http://localhost:3000/questions")
+    fetch(`${ip}/questions`)
       .then(res => res.json())
       .then(data => setQuestions(data.questions))
       .catch(err => console.error("Failed to fetch questions:", err));
