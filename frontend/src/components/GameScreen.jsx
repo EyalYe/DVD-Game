@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Use environment variable for API URL (defaults to localhost if not set)
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
-
 const PHASES = {
   LOBBY: "lobby",
   QUESTION: "question",
@@ -11,7 +8,7 @@ const PHASES = {
   OVER: "over"
 };
 
-const GamePanel = () => {
+const GameScreen = () => {
   // Player identity
   const [name, setName] = useState(() => sessionStorage.getItem("playerName") || "");
   const [joined, setJoined] = useState(!!sessionStorage.getItem("playerName"));
@@ -21,7 +18,7 @@ const GamePanel = () => {
   const [leaderId, setLeaderId] = useState(null);
   const [isLeader, setIsLeader] = useState(false);
 
-  // Phase state for the game
+  // Single source of truth for the game "phase"
   const [phase, setPhase] = useState(PHASES.LOBBY);
 
   // Additional states
@@ -36,11 +33,13 @@ const GamePanel = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  const [questionImage, setQuestionImage] = useState(null);
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
   const [correctAnswers, setCorrectAnswers] = useState([]);
+
+  // Flash color state for answer feedback ("green", "red", or null)
+  const [flashColor, setFlashColor] = useState(null);
 
   // Refs
   const socketRef = useRef(null);
@@ -49,7 +48,17 @@ const GamePanel = () => {
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
-  // On mount, load stored playerId if available
+  // Clear flash effect after a short time
+  useEffect(() => {
+    if (flashColor) {
+      const timeout = setTimeout(() => {
+        setFlashColor(null);
+      }, 500); // flash duration in ms
+      return () => clearTimeout(timeout);
+    }
+  }, [flashColor]);
+
+  // On mount, load stored playerId
   useEffect(() => {
     const storedId = sessionStorage.getItem("playerId");
     if (storedId) {
@@ -57,7 +66,7 @@ const GamePanel = () => {
     }
   }, []);
 
-  // WebSocket connection logic
+  // Connect to WebSocket
   const connectWebSocket = () => {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
       setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
@@ -66,9 +75,7 @@ const GamePanel = () => {
 
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    // Convert API_URL from http to ws
-    const wsUrl = API_URL.replace(/^http/, "ws");
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
 
     ws.onopen = () => {
       console.log("Connected to WebSocket");
@@ -76,11 +83,13 @@ const GamePanel = () => {
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
 
+      // If we already have a name + playerId, rejoin if we haven't done so yet
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
         ws.send(JSON.stringify({ type: "join", name, playerId: playerIdRef.current }));
       }
+      // Always request the current game state
       ws.send(JSON.stringify({ type: "requestGameState" }));
     };
 
@@ -97,7 +106,6 @@ const GamePanel = () => {
         if (!data.running) {
           setPhase(PHASES.LOBBY);
         } else {
-          // Default to QUESTION until a newQuestion or leaderboard message is received
           setPhase(PHASES.QUESTION);
         }
         setTimeLimit(data.timeLimit || 30);
@@ -110,15 +118,13 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
-        setQuestionImage(data.image || null);
       }
       else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
-        setCorrectAnswers(data.correctIndexes);
-        setCurrentQuestion(null);
+        setCurrentQuestion(data.question); // Store original question text
+        setCorrectAnswers(data.correctAnswers); // Use full-text correct answers
         setTimeLeft(null);
-        setQuestionImage(null);
       }
       else if (data.type === "timeUpdate") {
         setTimeLeft(data.timeLeft);
@@ -129,11 +135,13 @@ const GamePanel = () => {
       }
       else if (data.type === "answerResult") {
         console.log(`Answer result: correct=${data.correct}, newScore=${data.score}`);
+        // Flash green for correct, red for incorrect
+        setFlashColor(data.correct ? "green" : "red");
       }
     };
 
     ws.onclose = (event) => {
-      console.warn("WS closed:", event.code, event.reason);
+      console.warn("WebSocket closed:", event.code, event.reason);
       setConnectionStatus("disconnected");
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttemptsRef.current++;
@@ -145,7 +153,7 @@ const GamePanel = () => {
     };
 
     ws.onerror = (err) => {
-      console.error("WS error:", err);
+      console.error("WebSocket error:", err);
       setErrorMessage("Failed to connect to server. Is it running?");
       setConnectionStatus("error");
     };
@@ -153,6 +161,7 @@ const GamePanel = () => {
     socketRef.current = ws;
   };
 
+  // On mount, connect
   useEffect(() => {
     if (!sessionStorage.getItem("sessionStarted")) {
       sessionStorage.setItem("sessionStarted", "true");
@@ -161,7 +170,7 @@ const GamePanel = () => {
     }
     connectWebSocket();
     return () => {
-      console.log("Cleaning up WS");
+      console.log("Cleaning up WebSocket");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -173,6 +182,7 @@ const GamePanel = () => {
     };
   }, []);
 
+  // If we already have a name, auto-join on connect
   useEffect(() => {
     if (joined && connectionStatus === "connected" && !sessionStorage.getItem("hasJoined")) {
       console.log("Auto-joining...");
@@ -181,6 +191,7 @@ const GamePanel = () => {
     }
   }, [joined, connectionStatus]);
 
+  // Join logic
   const joinGame = () => {
     if (!name.trim()) {
       setErrorMessage("Please enter a name");
@@ -196,7 +207,6 @@ const GamePanel = () => {
     if (!playerIdRef.current) {
       playerIdRef.current = name + "_" + Math.random().toString(36).substr(2, 9);
       sessionStorage.setItem("playerId", playerIdRef.current);
-      console.log("Generated player ID:", playerIdRef.current);
     }
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
@@ -211,6 +221,7 @@ const GamePanel = () => {
     }
   };
 
+  // Start game
   const startGame = () => {
     if (isLeader && socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
@@ -220,6 +231,7 @@ const GamePanel = () => {
     }
   };
 
+  // Return to lobby without reloading
   const returnToLobby = () => {
     console.log("Returning to lobby...");
     setPhase(PHASES.LOBBY);
@@ -229,18 +241,19 @@ const GamePanel = () => {
     setSelectedAnswer([]);
     setAnswerSubmitted(false);
     setTimeLeft(null);
-    setQuestionImage(null);
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: "requestGameState" }));
     }
   };
 
+  // Continue to next question
   const continueToNext = () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: "nextQuestion" }));
     }
   };
 
+  // Answer submission
   const handleOptionClick = (option) => {
     if (answerSubmitted) return;
     if (isMultipleChoice) {
@@ -272,7 +285,11 @@ const GamePanel = () => {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render logic: single switch on "phase"
+  // ─────────────────────────────────────────────────────────────────────────
   const renderContent = () => {
+    // If not joined yet
     if (!joined) {
       return (
         <div className="join-screen">
@@ -290,6 +307,8 @@ const GamePanel = () => {
         </div>
       );
     }
+
+    // If phase is LOBBY
     if (phase === PHASES.LOBBY) {
       return (
         <div className="lobby">
@@ -321,14 +340,13 @@ const GamePanel = () => {
         </div>
       );
     }
+
+    // If phase is QUESTION
     if (phase === PHASES.QUESTION && currentQuestion) {
       return (
         <div className="game-play">
           <div className="question-section">
             <h3>{currentQuestion}</h3>
-            {questionImage && (
-              <img src={`${API_URL}${questionImage}`} alt="Question" className="question-image" />
-            )}
             <div className="options">
               {options.map((option, idx) => {
                 const isSelected = selectedAnswer.includes(option);
@@ -347,7 +365,10 @@ const GamePanel = () => {
               })}
             </div>
             {isMultipleChoice && (
-              <button onClick={handleSubmitMultipleChoice} disabled={answerSubmitted || selectedAnswer.length === 0}>
+              <button
+                onClick={handleSubmitMultipleChoice}
+                disabled={answerSubmitted || selectedAnswer.length === 0}
+              >
                 Submit
               </button>
             )}
@@ -360,6 +381,8 @@ const GamePanel = () => {
         </div>
       );
     }
+
+    // If phase is LEADERBOARD
     if (phase === PHASES.LEADERBOARD) {
       return (
         <div className="game-play">
@@ -367,9 +390,13 @@ const GamePanel = () => {
             <h3>Leaderboard</h3>
             <ul>
               {leaderboard.map(entry => (
-                <li key={entry.id}>{entry.id}: {entry.score}</li>
+                <li key={entry.id}>
+                  {entry.id}: {entry.score}
+                </li>
               ))}
             </ul>
+            {/* Display original question and correct answers */}
+            <h4>Question: {currentQuestion}</h4>
             <h4>Correct Answer: {correctAnswers.join(", ")}</h4>
             {isLeader && (
               <button onClick={continueToNext}>
@@ -380,6 +407,8 @@ const GamePanel = () => {
         </div>
       );
     }
+
+    // If phase is OVER
     if (phase === PHASES.OVER) {
       return (
         <div className="game-over">
@@ -387,18 +416,22 @@ const GamePanel = () => {
           <h3>Final Leaderboard:</h3>
           <ul>
             {leaderboard.map(entry => (
-              <li key={entry.id}>{entry.id}: {entry.score}</li>
+              <li key={entry.id}>
+                {entry.id}: {entry.score}
+              </li>
             ))}
           </ul>
           <button onClick={returnToLobby}>Return to Lobby</button>
         </div>
       );
     }
+
+    // Fallback
     return <h3>Loading...</h3>;
   };
 
   return (
-    <div className="game-container">
+    <div className={`game-container ${flashColor ? `flash-${flashColor}` : ""}`}>
       {connectionStatus === "connected" && <div className="text-green-600">Connected to server</div>}
       {errorMessage && <div className="text-red-600 mt-2">{errorMessage}</div>}
       {renderContent()}
@@ -406,4 +439,4 @@ const GamePanel = () => {
   );
 };
 
-export default GamePanel;
+export default GameScreen;
