@@ -1,7 +1,8 @@
 const express = require("express");
+const cors = require("cors");
 const router = express.Router();
 require("dotenv").config();
-
+app.use(cors());
 // Admin login route
 router.post("/admin-login", (req, res) => {
   const { password } = req.body;
