@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Use environment variable for API URL (defaults to localhost if not set)
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+// Use environment variable for API URL if available; fallback to localhost.
+const API_URL =
+  typeof process !== "undefined" && process.env.REACT_APP_API_URL
+    ? process.env.REACT_APP_API_URL
+    : "http://localhost:3000";
 
 const PHASES = {
   LOBBY: "lobby",
@@ -36,7 +39,7 @@ const GamePanel = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  const [questionImage, setQuestionImage] = useState(null); // NEW: State for question image
+  const [questionImage, setQuestionImage] = useState(null);
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
@@ -76,9 +79,10 @@ const GamePanel = () => {
       setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
       return;
     }
+
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    // Convert API_URL to a WS URL (replace http with ws)
+    // Convert API_URL from http to ws (if needed)
     const wsUrl = API_URL.replace(/^http/, "ws");
     const ws = new WebSocket(wsUrl);
 
@@ -87,6 +91,7 @@ const GamePanel = () => {
       setConnectionStatus("connected");
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
+
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
@@ -98,6 +103,7 @@ const GamePanel = () => {
     ws.onmessage = (msg) => {
       const data = JSON.parse(msg.data);
       console.log("WS message:", data);
+
       if (data.type === "updatePlayers") {
         setPlayers(data.players);
         setLeaderId(data.leaderId);
@@ -117,12 +123,10 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
-        // NEW: Set questionImage from data (if provided)
         setQuestionImage(data.image || null);
       } else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
-        // For leaderboard, we assume the server sends full-text correct answers
         setCorrectAnswers(data.correctIndexes || []);
         setCurrentQuestion(null);
         setTimeLeft(null);
