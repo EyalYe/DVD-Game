@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Set API_URL from environment or default to localhost
+// Use environment variable for API URL (defaults to localhost if not set)
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
 const PHASES = {
@@ -11,7 +11,7 @@ const PHASES = {
   OVER: "over"
 };
 
-const GameScreen = () => {
+const GamePanel = () => {
   // Player identity
   const [name, setName] = useState(() => sessionStorage.getItem("playerName") || "");
   const [joined, setJoined] = useState(!!sessionStorage.getItem("playerName"));
@@ -21,7 +21,7 @@ const GameScreen = () => {
   const [leaderId, setLeaderId] = useState(null);
   const [isLeader, setIsLeader] = useState(false);
 
-  // Single source of truth for the game "phase"
+  // Single source for phase (lobby, question, leaderboard, over)
   const [phase, setPhase] = useState(PHASES.LOBBY);
 
   // Additional states
@@ -36,7 +36,7 @@ const GameScreen = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  const [questionImage, setQuestionImage] = useState(null); // New state for image
+  const [questionImage, setQuestionImage] = useState(null);
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
@@ -49,7 +49,7 @@ const GameScreen = () => {
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
-  // On mount, load stored playerId
+  // On mount, load stored playerId if available
   useEffect(() => {
     const storedId = sessionStorage.getItem("playerId");
     if (storedId) {
@@ -57,6 +57,7 @@ const GameScreen = () => {
     }
   }, []);
 
+  // WebSocket connection
   const connectWebSocket = () => {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
       setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
@@ -65,15 +66,15 @@ const GameScreen = () => {
 
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
+    const ws = new WebSocket(`${API_URL.replace(/^http/, "ws")}`);
 
     ws.onopen = () => {
-      console.log("Connected to WebSocket - Ready State:", ws.readyState);
+      console.log("Connected to WebSocket");
       setConnectionStatus("connected");
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
 
-      // Auto-join if already joined and we have a playerId
+      // Auto-join if already joined
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
@@ -94,6 +95,7 @@ const GameScreen = () => {
         if (!data.running) {
           setPhase(PHASES.LOBBY);
         } else {
+          // Assume QUESTION phase until a newQuestion or leaderboard message comes
           setPhase(PHASES.QUESTION);
         }
         setTimeLimit(data.timeLimit || 30);
@@ -105,7 +107,6 @@ const GameScreen = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
-        // NEW: set image if provided (or null otherwise)
         setQuestionImage(data.image || null);
       } else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
@@ -153,7 +154,7 @@ const GameScreen = () => {
     }
     connectWebSocket();
     return () => {
-      console.log("Cleaning up WS");
+      console.log("Cleaning up WebSocket");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -339,7 +340,10 @@ const GameScreen = () => {
               })}
             </div>
             {isMultipleChoice && (
-              <button onClick={handleSubmitMultipleChoice} disabled={answerSubmitted || selectedAnswer.length === 0}>
+              <button
+                onClick={handleSubmitMultipleChoice}
+                disabled={answerSubmitted || selectedAnswer.length === 0}
+              >
                 Submit
               </button>
             )}
@@ -391,11 +395,15 @@ const GameScreen = () => {
 
   return (
     <div className="game-container">
-      {connectionStatus === "connected" && <div className="text-green-600">Connected to server</div>}
-      {errorMessage && <div className="text-red-600 mt-2">{errorMessage}</div>}
+      {connectionStatus === "connected" && (
+        <div className="text-green-600">Connected to server</div>
+      )}
+      {errorMessage && (
+        <div className="text-red-600 mt-2">{errorMessage}</div>
+      )}
       {renderContent()}
     </div>
   );
 };
 
-export default GameScreen;
+export default GamePanel;
