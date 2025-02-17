@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Use environment variable for API URL if available; fallback to localhost.
-const API_URL =
-  typeof process !== "undefined" && process.env.REACT_APP_API_URL
-    ? process.env.REACT_APP_API_URL
-    : "http://localhost:3000";
+// Use environment variable for API URL if available; fallback to your production domain if not set.
+// (For Create React App, ensure you have REACT_APP_API_URL defined in a .env file and restart the build.)
+const API_URL = process.env.REACT_APP_API_URL || "http://139.162.187.187:3000";
 
 const PHASES = {
   LOBBY: "lobby",
@@ -65,7 +63,7 @@ const GamePanel = () => {
     }
   }, [flashColor]);
 
-  // On mount, load stored playerId
+  // On mount, load stored playerId if available
   useEffect(() => {
     const storedId = sessionStorage.getItem("playerId");
     if (storedId) {
@@ -82,7 +80,7 @@ const GamePanel = () => {
 
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    // Convert API_URL from http to ws (if needed)
+    // Convert API_URL from http to ws
     const wsUrl = API_URL.replace(/^http/, "ws");
     const ws = new WebSocket(wsUrl);
 
@@ -92,6 +90,7 @@ const GamePanel = () => {
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
 
+      // Auto-join if we have a name and playerId
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
@@ -123,6 +122,7 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
+        // Set question image if provided
         setQuestionImage(data.image || null);
       } else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
