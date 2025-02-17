@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import "../styles/Viewer.css"; // Make sure this file is updated per instructions below
+import "../styles/Viewer.css";
 
 const PHASES = {
   LOBBY: "lobby",
@@ -8,7 +8,7 @@ const PHASES = {
   OVER: "over"
 };
 
-const Viewer = () => {
+const Viewer = ({ backendUrl }) => {
   const [phase, setPhase] = useState(PHASES.LOBBY);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [options, setOptions] = useState([]);
@@ -23,45 +23,54 @@ const Viewer = () => {
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
+  // Use the provided backendUrl or fallback to window.location.hostname with port 3000
+  const wsUrl =
+    backendUrl && backendUrl.startsWith("http")
+      ? backendUrl.replace(/^http/, "ws")
+      : `ws://${window.location.hostname}:3000`;
+
   const connectWebSocket = () => {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
       setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
       return;
     }
     setConnectionStatus("connecting");
-    const ws = new WebSocket(`ws://${window.location.hostname}:3000`);
+    const ws = new WebSocket(wsUrl);
     ws.onopen = () => {
       setConnectionStatus("connected");
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
-      // As a viewer, request the current state.
+      // As a viewer, request the current game state.
       ws.send(JSON.stringify({ type: "requestGameState" }));
     };
 
     ws.onmessage = (msg) => {
-      const data = JSON.parse(msg.data);
-      console.log("Viewer WS message:", data);
-
-      if (data.type === "newQuestion") {
-        setPhase(PHASES.QUESTION);
-        setCurrentQuestion(data.question);
-        setOptions(data.options);
-        setTimeLeft(null);
-      } else if (data.type === "leaderboard") {
-        setPhase(PHASES.LEADERBOARD);
-        setLeaderboard(data.scores);
-        setCurrentQuestion(data.question);
-        setCorrectAnswers(data.correctAnswers);
-        setTimeLeft(null);
-      } else if (data.type === "timeUpdate") {
-        setTimeLeft(data.timeLeft);
-      } else if (data.type === "gameOver") {
-        setPhase(PHASES.OVER);
-        setLeaderboard(data.leaderboard);
+      try {
+        const data = JSON.parse(msg.data);
+        console.log("Viewer WS message:", data);
+        if (data.type === "newQuestion") {
+          setPhase(PHASES.QUESTION);
+          setCurrentQuestion(data.question);
+          setOptions(data.options);
+          setTimeLeft(null);
+        } else if (data.type === "leaderboard") {
+          setPhase(PHASES.LEADERBOARD);
+          setLeaderboard(data.scores);
+          setCurrentQuestion(data.question);
+          setCorrectAnswers(data.correctAnswers);
+          setTimeLeft(null);
+        } else if (data.type === "timeUpdate") {
+          setTimeLeft(data.timeLeft);
+        } else if (data.type === "gameOver") {
+          setPhase(PHASES.OVER);
+          setLeaderboard(data.leaderboard);
+        }
+      } catch (err) {
+        console.error("Error parsing WS message:", err);
       }
     };
 
-    ws.onclose = (event) => {
+    ws.onclose = () => {
       setConnectionStatus("disconnected");
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttemptsRef.current++;
@@ -90,6 +99,8 @@ const Viewer = () => {
         socketRef.current.close();
       }
     };
+    // We intentionally do not include wsUrl in the dependency array to avoid reconnect loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const renderContent = () => {
@@ -100,7 +111,9 @@ const Viewer = () => {
           <h3 className="viewer-question">{currentQuestion}</h3>
           <ul className="viewer-options">
             {options.map((option, idx) => (
-              <li key={idx} className="viewer-option">{option}</li>
+              <li key={idx} className="viewer-option">
+                {option}
+              </li>
             ))}
           </ul>
           {timeLeft !== null && <p className="viewer-timer">Time Left: {timeLeft}s</p>}
@@ -111,7 +124,7 @@ const Viewer = () => {
         <div className="viewer-section">
           <h2 className="viewer-title">Leaderboard</h2>
           <ul className="viewer-leaderboard">
-            {leaderboard.map(entry => (
+            {leaderboard.map((entry) => (
               <li key={entry.id} className="viewer-leaderboard-item">
                 {entry.id}: {entry.score}
               </li>
@@ -119,7 +132,9 @@ const Viewer = () => {
           </ul>
           <div className="viewer-answer">
             <h3 className="viewer-question">Question: {currentQuestion}</h3>
-            <h3 className="viewer-correct">Correct Answer: {correctAnswers.join(", ")}</h3>
+            <h3 className="viewer-correct">
+              Correct Answer: {correctAnswers.join(", ")}
+            </h3>
           </div>
         </div>
       );
@@ -129,7 +144,7 @@ const Viewer = () => {
           <h2 className="viewer-title">Game Over!</h2>
           <h3 className="viewer-subtitle">Final Leaderboard:</h3>
           <ul className="viewer-leaderboard">
-            {leaderboard.map(entry => (
+            {leaderboard.map((entry) => (
               <li key={entry.id} className="viewer-leaderboard-item">
                 {entry.id}: {entry.score}
               </li>
