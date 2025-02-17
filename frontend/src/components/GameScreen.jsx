@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Use environment variable for API URL if available; fallback to your production URL.
-// (This is still used for API/WebSocket connections, but not for image concatenation.)
-const API_URL =
-  typeof process !== "undefined" && process.env.REACT_APP_API_URL
-    ? process.env.REACT_APP_API_URL
-    : "http://139.162.187.187:3000";
+/**
+ * GamePanel
+ *
+ * 1. We define a "backendUrl" or "ip" that references your server (e.g. "http://139.162.187.187:3000").
+ * 2. For images, if the server returns `image: "/uploads/12345.png"`, we do `<img src={`${ip}${imageField}`} ...>`.
+ * 3. We still do WebSocket connections by converting `http://` to `ws://` for the socket, as before.
+ */
+
+// If you prefer to pass this from a parent prop, you can do: 
+// const GamePanel = ({ backendUrl }) => {
+//   const ip = backendUrl || "http://139.162.187.187:3000";
+// }
+// Otherwise, we just define a constant here:
+const ip = "http://139.162.187.187:3000";
 
 const PHASES = {
   LOBBY: "lobby",
@@ -40,8 +48,7 @@ const GamePanel = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  // NEW: We now store the image as provided by the server (assumed relative)
-  const [questionImage, setQuestionImage] = useState(null);
+  const [questionImage, setQuestionImage] = useState(null); // image field from the server
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
@@ -83,8 +90,9 @@ const GamePanel = () => {
     }
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    // Convert API_URL from http to ws for WebSocket connection
-    const wsUrl = API_URL.replace(/^http/, "ws");
+
+    // Convert ip from http to ws
+    const wsUrl = ip.replace(/^http/, "ws");
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -92,6 +100,7 @@ const GamePanel = () => {
       setConnectionStatus("connected");
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
+
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
@@ -103,18 +112,21 @@ const GamePanel = () => {
     ws.onmessage = (msg) => {
       const data = JSON.parse(msg.data);
       console.log("WS message:", data);
+
       if (data.type === "updatePlayers") {
         setPlayers(data.players);
         setLeaderId(data.leaderId);
         setIsLeader(playerIdRef.current === data.leaderId);
-      } else if (data.type === "gameStatus") {
+      } 
+      else if (data.type === "gameStatus") {
         if (!data.running) {
           setPhase(PHASES.LOBBY);
         } else {
           setPhase(PHASES.QUESTION);
         }
         setTimeLimit(data.timeLimit || 30);
-      } else if (data.type === "newQuestion") {
+      } 
+      else if (data.type === "newQuestion") {
         setPhase(PHASES.QUESTION);
         setCurrentQuestion(data.question);
         setOptions(data.options);
@@ -122,21 +134,27 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
-        // Set questionImage using the relative path provided by the server.
+
+        // If the server sends e.g. "/uploads/1739730176613.png", store it
+        // We'll display by doing <img src={`${ip}${questionImage}`} />
         setQuestionImage(data.image || null);
-      } else if (data.type === "leaderboard") {
+      } 
+      else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
-        setCorrectAnswers(data.correctIndexes || []);
+        setCorrectAnswers(data.correctAnswers || []);
         setCurrentQuestion(null);
         setTimeLeft(null);
         setQuestionImage(null);
-      } else if (data.type === "timeUpdate") {
+      } 
+      else if (data.type === "timeUpdate") {
         setTimeLeft(data.timeLeft);
-      } else if (data.type === "gameOver") {
+      } 
+      else if (data.type === "gameOver") {
         setPhase(PHASES.OVER);
         setLeaderboard(data.leaderboard);
-      } else if (data.type === "answerResult") {
+      } 
+      else if (data.type === "answerResult") {
         console.log(`Answer result: correct=${data.correct}, newScore=${data.score}`);
         setFlashColor(data.correct ? "green" : "red");
       }
@@ -337,8 +355,12 @@ const GamePanel = () => {
           <div className="question-section">
             <h3>{currentQuestion}</h3>
             {questionImage && (
-              // Use the relative image URL directly.
-              <img src={questionImage} alt="Question" className="question-image" />
+              // We use `ip + questionImage` as done in AdminPanel
+              <img
+                src={`${ip}${questionImage}`}
+                alt="Question"
+                className="question-image"
+              />
             )}
             <div className="options">
               {options.map((option, idx) => {
@@ -358,7 +380,10 @@ const GamePanel = () => {
               })}
             </div>
             {isMultipleChoice && (
-              <button onClick={handleSubmitMultipleChoice} disabled={answerSubmitted || selectedAnswer.length === 0}>
+              <button
+                onClick={handleSubmitMultipleChoice}
+                disabled={answerSubmitted || selectedAnswer.length === 0}
+              >
                 Submit
               </button>
             )}
@@ -418,4 +443,3 @@ const GamePanel = () => {
 };
 
 export default GamePanel;
-
