@@ -15,7 +15,7 @@ const wss = new WebSocket.Server({
 
 app.use(cors());
 app.use(express.json());
-// Use the uploads folder as defined in your old version
+// Serve static files from the uploads folder (adjust if necessary)
 app.use("/uploads", express.static("backend/uploads"));
 
 // Existing routes
@@ -33,12 +33,11 @@ let questionTimeLimit = 30;
 let connectionCount = 0;
 
 // Score + question tracking
-let currentQuestionIndex = 0;
-let playerScores = new Map();
-let currentAnswers = new Set();
 let currentQuestionData = null;
 let currentQuestionTimeout = null;
 let timeUpdateInterval = null;
+let playerScores = new Map();
+let currentAnswers = new Set();
 
 // NEW: Track the current phase of the game: "lobby" | "question" | "leaderboard" | "over"
 let phase = "lobby";
@@ -48,8 +47,16 @@ let questionEnded = false;
 
 function noop() {}
 
-// ──────────────────────────────────────────────────────────────
-// WebSocket Connections
+// Helper: Shuffle an array using Fisher-Yates algorithm
+function shuffleArray(array) {
+    let arr = array.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 wss.on("connection", (ws, req) => {
     connectionCount++;
     const clientId = `client_${connectionCount}`;
@@ -97,7 +104,6 @@ wss.on("connection", (ws, req) => {
                 }
 
                 broadcastPlayers();
-                // Send current state to the joining player
                 sendCurrentState(ws);
             }
 
@@ -105,10 +111,10 @@ wss.on("connection", (ws, req) => {
                 console.log(`Starting game with time limit: ${data.timeLimit} seconds`);
                 gameActive = true;
                 questionTimeLimit = data.timeLimit;
+                // Load questions from gameManager (assume it returns an array)
                 questions = gameManager.getQuestions();
-                currentQuestionIndex = 0;
                 playerScores.clear();
-                phase = "question"; // Set phase to question
+                phase = "question";
 
                 broadcast({
                     type: "gameStatus",
@@ -122,6 +128,7 @@ wss.on("connection", (ws, req) => {
             if (data.type === "nextQuestion" && ws.playerId === leader) {
                 console.log("Leader requested next question.");
                 if (phase === "question" && !questionEnded) {
+                    // End the current question early
                     questionEnded = true;
                     clearTimeout(currentQuestionTimeout);
                     clearInterval(timeUpdateInterval);
@@ -227,12 +234,11 @@ function sendCurrentState(ws) {
             isMultipleChoice: currentQuestionData.isMultipleChoice,
             image: currentQuestionData.image || null
         }));
-    } else if (phase === "leaderboard" && questionEnded) {
+    } else if (phase === "leaderboard") {
         const board = Array.from(players.values()).map(player => ({
             id: player.id,
             score: playerScores.get(player.id) || 0
         }));
-        // Compute actual correct answer texts from the current question
         let correctAnswersText = [];
         let originalOptions = [];
         if (currentQuestionData && currentQuestionData.options) {
@@ -307,9 +313,9 @@ function broadcast(data) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// serveNextQuestion: Broadcast a new question (and its image) to all clients
+// serveNextQuestion: Choose a random question and shuffle its options
 function serveNextQuestion() {
-    if (!gameActive || currentQuestionIndex >= questions.length) {
+    if (!gameActive || questions.length === 0) {
         console.log("Game Over. No more questions.");
         phase = "over";
         const finalBoard = Array.from(players.values()).map(player => ({
@@ -324,30 +330,48 @@ function serveNextQuestion() {
         return;
     }
 
-    phase = "question";
+    // Choose a random question from the list
+    const randomIndex = Math.floor(Math.random() * questions.length);
+    const selectedQuestion = questions[randomIndex];
 
-    const question = questions[currentQuestionIndex];
-    currentQuestionIndex++;
+    // Remove selected question from the pool (if you don't want repeats)
+    questions.splice(randomIndex, 1);
 
+    // Shuffle options and update correct indexes accordingly.
+    const originalOptions = selectedQuestion.options.slice();
+    const shuffledOptions = shuffleArray(originalOptions);
+    // Compute new correct indexes by matching option text (case-insensitive)
+    const newCorrectIndexes = [];
+    selectedQuestion.correctIndexes.forEach(oldIdx => {
+        const correctOption = originalOptions[oldIdx].trim().toLowerCase();
+        const newIdx = shuffledOptions.findIndex(opt => opt.trim().toLowerCase() === correctOption);
+        if (newIdx !== -1) {
+            newCorrectIndexes.push(newIdx);
+        }
+    });
+
+    // Update the question data that will be sent to clients.
+    currentQuestionData = {
+        question: selectedQuestion.question,
+        options: shuffledOptions,
+        correctIndexes: newCorrectIndexes,
+        isMultipleChoice: selectedQuestion.isMultipleChoice,
+        image: selectedQuestion.image || null
+    };
+
+    // Reset tracking for the new question
     currentAnswers = new Set();
     questionEnded = false;
-    currentQuestionData = question;
+    phase = "question";
 
-    console.log(`Serving question ${currentQuestionIndex}: ${question.question}`);
+    console.log(`Serving random question: ${currentQuestionData.question}`);
 
-    // Ensure the image field is a proper relative URL
-    let imageField = null;
-    if (question.image) {
-        imageField = question.image.startsWith("/") ? question.image : "/" + question.image;
-    }
-
-    // Broadcast the new question, including the image field
     broadcast({
         type: "newQuestion",
-        question: question.question,
-        options: question.options,
-        isMultipleChoice: question.isMultipleChoice,
-        image: imageField
+        question: currentQuestionData.question,
+        options: currentQuestionData.options,
+        isMultipleChoice: currentQuestionData.isMultipleChoice,
+        image: currentQuestionData.image // Relative URL as stored in DB
     });
 
     // Time updates: broadcast a "timeUpdate" every 10% of questionTimeLimit seconds
@@ -377,13 +401,13 @@ function serveNextQuestion() {
             questionEnded = true;
             clearInterval(timeUpdateInterval);
             timeUpdateInterval = null;
-            showLeaderboard(question.correctIndexes);
+            showLeaderboard(currentQuestionData.correctIndexes);
         }
     }, questionTimeLimit * 1000);
 }
 
 // ──────────────────────────────────────────────────────────────
-// showLeaderboard: Convert correct indexes to answer texts and broadcast leaderboard
+// showLeaderboard: Send leaderboard with actual answer texts
 function showLeaderboard(correctIndexes) {
     console.log("Displaying leaderboard...");
     phase = "leaderboard";
@@ -409,7 +433,7 @@ function showLeaderboard(correctIndexes) {
     });
 
     // Optionally reset scores every 10 questions
-    if (currentQuestionIndex % 10 === 0) {
+    if (currentQuestionData && currentQuestionData.id && currentQuestionData.id % 10 === 0) {
         console.log("Resetting leaderboard after 10 questions.");
         playerScores.clear();
     }
