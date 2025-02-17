@@ -21,7 +21,7 @@ const GamePanel = () => {
   const [leaderId, setLeaderId] = useState(null);
   const [isLeader, setIsLeader] = useState(false);
 
-  // Single source for phase (lobby, question, leaderboard, over)
+  // Phase state for the game
   const [phase, setPhase] = useState(PHASES.LOBBY);
 
   // Additional states
@@ -57,7 +57,7 @@ const GamePanel = () => {
     }
   }, []);
 
-  // WebSocket connection
+  // WebSocket connection logic
   const connectWebSocket = () => {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
       setErrorMessage("Maximum reconnection attempts reached. Please refresh the page.");
@@ -66,7 +66,9 @@ const GamePanel = () => {
 
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    const ws = new WebSocket(`${API_URL.replace(/^http/, "ws")}`);
+    // Convert API_URL from http to ws
+    const wsUrl = API_URL.replace(/^http/, "ws");
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log("Connected to WebSocket");
@@ -74,7 +76,6 @@ const GamePanel = () => {
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
 
-      // Auto-join if already joined
       if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
         console.log("Rejoining with existing player ID:", playerIdRef.current);
         sessionStorage.setItem("hasJoined", "true");
@@ -91,15 +92,17 @@ const GamePanel = () => {
         setPlayers(data.players);
         setLeaderId(data.leaderId);
         setIsLeader(playerIdRef.current === data.leaderId);
-      } else if (data.type === "gameStatus") {
+      }
+      else if (data.type === "gameStatus") {
         if (!data.running) {
           setPhase(PHASES.LOBBY);
         } else {
-          // Assume QUESTION phase until a newQuestion or leaderboard message comes
+          // Default to QUESTION until a newQuestion or leaderboard message is received
           setPhase(PHASES.QUESTION);
         }
         setTimeLimit(data.timeLimit || 30);
-      } else if (data.type === "newQuestion") {
+      }
+      else if (data.type === "newQuestion") {
         setPhase(PHASES.QUESTION);
         setCurrentQuestion(data.question);
         setOptions(data.options);
@@ -108,19 +111,23 @@ const GamePanel = () => {
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
         setQuestionImage(data.image || null);
-      } else if (data.type === "leaderboard") {
+      }
+      else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
         setCorrectAnswers(data.correctIndexes);
         setCurrentQuestion(null);
         setTimeLeft(null);
         setQuestionImage(null);
-      } else if (data.type === "timeUpdate") {
+      }
+      else if (data.type === "timeUpdate") {
         setTimeLeft(data.timeLeft);
-      } else if (data.type === "gameOver") {
+      }
+      else if (data.type === "gameOver") {
         setPhase(PHASES.OVER);
         setLeaderboard(data.leaderboard);
-      } else if (data.type === "answerResult") {
+      }
+      else if (data.type === "answerResult") {
         console.log(`Answer result: correct=${data.correct}, newScore=${data.score}`);
       }
     };
@@ -154,7 +161,7 @@ const GamePanel = () => {
     }
     connectWebSocket();
     return () => {
-      console.log("Cleaning up WebSocket");
+      console.log("Cleaning up WS");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -340,10 +347,7 @@ const GamePanel = () => {
               })}
             </div>
             {isMultipleChoice && (
-              <button
-                onClick={handleSubmitMultipleChoice}
-                disabled={answerSubmitted || selectedAnswer.length === 0}
-              >
+              <button onClick={handleSubmitMultipleChoice} disabled={answerSubmitted || selectedAnswer.length === 0}>
                 Submit
               </button>
             )}
@@ -395,12 +399,8 @@ const GamePanel = () => {
 
   return (
     <div className="game-container">
-      {connectionStatus === "connected" && (
-        <div className="text-green-600">Connected to server</div>
-      )}
-      {errorMessage && (
-        <div className="text-red-600 mt-2">{errorMessage}</div>
-      )}
+      {connectionStatus === "connected" && <div className="text-green-600">Connected to server</div>}
+      {errorMessage && <div className="text-red-600 mt-2">{errorMessage}</div>}
       {renderContent()}
     </div>
   );
