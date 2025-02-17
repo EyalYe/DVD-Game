@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-// Use environment variable for API URL if available; fallback to production URL.
+// Use environment variable for API URL if available; fallback to your production URL.
+// (This is still used for API/WebSocket connections, but not for image concatenation.)
 const API_URL =
   typeof process !== "undefined" && process.env.REACT_APP_API_URL
     ? process.env.REACT_APP_API_URL
@@ -39,6 +40,7 @@ const GamePanel = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
+  // NEW: We now store the image as provided by the server (assumed relative)
   const [questionImage, setQuestionImage] = useState(null);
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
@@ -81,7 +83,7 @@ const GamePanel = () => {
     }
     setConnectionStatus("connecting");
     console.log(`Initiating WebSocket connection... Attempt ${reconnectAttemptsRef.current + 1}`);
-    // Convert API_URL from http to ws
+    // Convert API_URL from http to ws for WebSocket connection
     const wsUrl = API_URL.replace(/^http/, "ws");
     const ws = new WebSocket(wsUrl);
 
@@ -120,6 +122,7 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
+        // Set questionImage using the relative path provided by the server.
         setQuestionImage(data.image || null);
       } else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
@@ -334,7 +337,8 @@ const GamePanel = () => {
           <div className="question-section">
             <h3>{currentQuestion}</h3>
             {questionImage && (
-              <img src={`${API_URL}${questionImage}`} alt="Question" className="question-image" />
+              // Use the relative image URL directly.
+              <img src={questionImage} alt="Question" className="question-image" />
             )}
             <div className="options">
               {options.map((option, idx) => {
