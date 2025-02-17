@@ -13,8 +13,8 @@ const gameManager = require("./gameManager");
 const app = express();
 const server = http.createServer(app);
 
-// Serve static files from the "uploads" folder.  
-// Ensure that the uploads folder is in the same directory as this file.
+// Serve static files from the "uploads" folder.
+// Adjust the path if your uploads folder is in a different location.
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use(cors());
@@ -27,18 +27,18 @@ const authRoutes = require("./routes/auth");
 app.use("/auth", authRoutes);
 
 // Global game state
-let questions = []; // Loaded when the game starts
+let questions = []; // Will be loaded when the game starts
 let players = new Map();
 let leader = null;
 let gameActive = false;
 let questionTimeLimit = 30;
 let connectionCount = 0;
 
-// Game flow and scoring globals
+// Global variables for game flow and scoring
 let currentQuestionIndex = 0;
-let playerScores = new Map(); // Map of playerId to score
+let playerScores = new Map(); // Key: playerId, Value: score
 
-// Tracking current question state
+// Global variables for tracking answers and question state
 let currentAnswers = new Set();     // IDs of players who answered the current question
 let currentQuestionData = null;     // The current question object
 let currentQuestionTimeout = null;  // Timeout handle for auto-showing leaderboard
@@ -47,7 +47,6 @@ let questionEnded = false;          // Flag to prevent multiple triggers
 
 function noop() {}
 
-// Create WebSocket server
 const wss = new WebSocket.Server({
   server,
   clientTracking: true,
@@ -65,7 +64,6 @@ wss.on("connection", (ws, req) => {
     this.isAlive = true;
   });
 
-  // Send initial connection message
   ws.send(JSON.stringify({
     type: "connected",
     clientId: clientId,
@@ -90,11 +88,8 @@ wss.on("connection", (ws, req) => {
       }
 
       if (data.type === "join") {
-        // Use provided playerId or fallback to ws.id
         const playerId = data.playerId || ws.id;
         console.log(`Player joining: ${data.name} (${playerId})`);
-
-        // Attach playerId to ws
         ws.playerId = playerId;
         players.set(playerId, {
           id: playerId,
@@ -110,7 +105,7 @@ wss.on("connection", (ws, req) => {
         }
         broadcastPlayers();
 
-        // If a player joins mid-question, mark them as answered to avoid blocking
+        // If a player joins mid-question, mark them as answered
         if (gameActive && currentQuestionData) {
           console.log(`Player ${playerId} joined mid-question. Marking as answered.`);
           currentAnswers.add(playerId);
@@ -121,7 +116,7 @@ wss.on("connection", (ws, req) => {
             message: "You joined mid-question and have been marked as having answered incorrectly."
           }));
           if (currentAnswers.size === players.size && !questionEnded) {
-            console.log("All players answered (including late joiners), showing leaderboard.");
+            console.log("All players (including late joiners) answered, showing leaderboard.");
             questionEnded = true;
             clearTimeout(currentQuestionTimeout);
             clearInterval(timeUpdateInterval);
@@ -299,18 +294,17 @@ function serveNextQuestion() {
 
   console.log(`Serving question ${currentQuestionIndex}: ${question.question}`);
 
-  // Construct full image URL if question.image exists
-  const imageField = question.image ? question.image : null;
-
+  // Broadcast the new question.
+  // The image field is taken from the question object.
   broadcast({
     type: "newQuestion",
     question: question.question,
     options: question.options,
     isMultipleChoice: question.isMultipleChoice,
-    image: imageField
+    image: question.image // This should be a relative URL like "/uploads/1739730176613.png"
   });
 
-  // Time updates: broadcast a "timeUpdate" every 10% of questionTimeLimit seconds
+  // Time updates: broadcast a "timeUpdate" every 10% of questionTimeLimit seconds.
   const steps = 10;
   let stepCount = 1;
   const stepIntervalMs = (questionTimeLimit * 1000) / steps;
@@ -344,13 +338,22 @@ function serveNextQuestion() {
 
 function showLeaderboard(correctIndexes) {
   console.log("Displaying leaderboard...");
+  // Generate the correct answer texts using currentQuestionData
+  let correctAnswersText = [];
+  let originalOptions = [];
+  if (currentQuestionData && currentQuestionData.options) {
+    originalOptions = currentQuestionData.options;
+    correctAnswersText = currentQuestionData.correctIndexes.map(idx => currentQuestionData.options[idx]);
+  }
   broadcast({
     type: "leaderboard",
     scores: Array.from(players.values()).map(player => ({
       id: player.id,
       score: playerScores.get(player.id) || 0
     })),
-    correctIndexes
+    correctIndexes: correctIndexes, // Keeping for backward compatibility if needed
+    correctAnswers: correctAnswersText, // Actual answer texts
+    originalOptions: originalOptions
   });
   if (currentQuestionIndex % 10 === 0) {
     console.log("Resetting leaderboard after 10 questions.");
