@@ -5,8 +5,8 @@ import GameScreen from "./components/GameScreen";
 import Viewer from "./components/Viewer"; // Import your Viewer component
 import "./styles/App.css";
 
-// Use the environment variable or fallback to localhost
-const ip = process.env.REACT_APP_BACKEND_URL || "http://localhost:3000";
+// Use Vite's environment variable or fallback to localhost
+const ip = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
 function App() {
   const handleStartGame = async () => {
