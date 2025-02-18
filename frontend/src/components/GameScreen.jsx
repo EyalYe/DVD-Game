@@ -35,7 +35,7 @@ const GamePanel = () => {
   const [selectedAnswer, setSelectedAnswer] = useState([]);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-  const [questionImage, setQuestionImage] = useState(null); // image field from the server
+  const [questionImage, setQuestionImage] = useState(null);
 
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
@@ -89,11 +89,14 @@ const GamePanel = () => {
       setErrorMessage("");
       reconnectAttemptsRef.current = 0;
 
-      if (joined && playerIdRef.current && !sessionStorage.getItem("hasJoined")) {
-        console.log("Rejoining with existing player ID:", playerIdRef.current);
-        sessionStorage.setItem("hasJoined", "true");
-        ws.send(JSON.stringify({ type: "join", name, playerId: playerIdRef.current }));
+      // Always auto-join if a player name and playerId are stored
+      const storedName = sessionStorage.getItem("playerName");
+      const storedId = sessionStorage.getItem("playerId");
+      if (storedName && storedId) {
+        playerIdRef.current = storedId;
+        ws.send(JSON.stringify({ type: "join", name: storedName, playerId: storedId }));
       }
+      
       ws.send(JSON.stringify({ type: "requestGameState" }));
     };
 
@@ -187,13 +190,7 @@ const GamePanel = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (joined && connectionStatus === "connected" && !sessionStorage.getItem("hasJoined")) {
-      console.log("Auto-joining...");
-      sessionStorage.setItem("hasJoined", "true");
-      joinGame();
-    }
-  }, [joined, connectionStatus]);
+  // Removed auto-join useEffect relying on "hasJoined" since we now auto-join on ws.onopen
 
   const joinGame = () => {
     if (!name.trim()) {
