@@ -255,7 +255,8 @@ function sendCurrentState(ws) {
             correctIndexes: currentQuestionData ? currentQuestionData.correctIndexes : [],
             correctAnswers: correctAnswersText,
             originalOptions: originalOptions,
-            currentQuestion: currentQuestionData.question
+            // NEW: Send the current question along with the leaderboard
+            currentQuestion: currentQuestionData ? currentQuestionData.question : null
         }));
     } else if (phase === "over") {
         const finalBoard = Array.from(players.values()).map(player => ({
@@ -411,7 +412,7 @@ function serveNextQuestion() {
 }
 
 // ──────────────────────────────────────────────────────────────
-// showLeaderboard: Send leaderboard with actual answer texts
+// showLeaderboard: Send leaderboard with actual answer texts along with current question
 function showLeaderboard(correctIndexes) {
     console.log("Displaying leaderboard...");
     phase = "leaderboard";
@@ -433,7 +434,9 @@ function showLeaderboard(correctIndexes) {
         scores: board,
         correctIndexes: correctIndexes,
         correctAnswers: correctAnswersText,
-        originalOptions: originalOptions
+        originalOptions: originalOptions,
+        // NEW: Send the current question along with the leaderboard
+        currentQuestion: currentQuestionData ? currentQuestionData.question : null
     });
 
     // NEW: If every connected player answered correctly, remove the question from the pool.
@@ -449,3 +452,4 @@ function showLeaderboard(correctIndexes) {
 server.listen(3000, () => {
     console.log("Game server running on port 3000");
 });
+

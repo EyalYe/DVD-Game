@@ -1,19 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/GameScreen.css";
 
-/**
- * GamePanel
- *
- * 1. We define a "backendUrl" or "ip" that references your server (e.g. "http://139.162.187.187:3000").
- * 2. For images, if the server returns `image: "/uploads/12345.png"`, we do `<img src={`${ip}${imageField}`} ...>`.
- * 3. We still do WebSocket connections by converting `http://` to `ws://` for the socket, as before.
- */
-
-// If you prefer to pass this from a parent prop, you can do: 
-// const GamePanel = ({ backendUrl }) => {
-//   const ip = backendUrl || "http://139.162.187.187:3000";
-// }
-// Otherwise, we just define a constant here:
 const ip = "http://139.162.187.187:3000";
 
 const PHASES = {
@@ -135,16 +122,14 @@ const GamePanel = () => {
         setSelectedAnswer([]);
         setAnswerSubmitted(false);
         setTimeLeft(timeLimit);
-
-        // If the server sends e.g. "/uploads/1739730176613.png", store it
-        // We'll display by doing <img src={`${ip}${questionImage}`} />
         setQuestionImage(data.image || null);
       } 
       else if (data.type === "leaderboard") {
         setPhase(PHASES.LEADERBOARD);
         setLeaderboard(data.scores);
         setCorrectAnswers(data.correctAnswers || []);
-        setCurrentQuestion(null);
+        // Use the current question sent with the leaderboard
+        setCurrentQuestion(data.currentQuestion || null);
         setTimeLeft(null);
         setQuestionImage(null);
       } 
@@ -356,7 +341,6 @@ const GamePanel = () => {
           <div className="question-section">
             <h3>{currentQuestion}</h3>
             {questionImage && (
-              // We use `ip + questionImage` as done in AdminPanel
               <img
                 src={`${ip}${questionImage}`}
                 alt="Question"
@@ -404,7 +388,9 @@ const GamePanel = () => {
             <h3>Leaderboard</h3>
             <ul>
               {leaderboard.map(entry => (
-                <li key={entry.id}>{entry.id}: {entry.score}</li>
+                <li key={entry.id}>
+                  {entry.id.split("_")[0]}: {entry.score}
+                </li>
               ))}
             </ul>
             <h4>{currentQuestionDisplay}</h4>
@@ -434,7 +420,9 @@ const GamePanel = () => {
           <h3>Final Leaderboard:</h3>
           <ul>
             {leaderboard.map(entry => (
-              <li key={entry.id}>{entry.id}: {entry.score}</li>
+              <li key={entry.id}>
+                {entry.id.split("_")[0]}: {entry.score}
+              </li>
             ))}
           </ul>
           <button onClick={returnToLobby}>Return to Lobby</button>
@@ -454,3 +442,4 @@ const GamePanel = () => {
 };
 
 export default GamePanel;
+
