@@ -38,6 +38,8 @@ let currentQuestionTimeout = null;
 let timeUpdateInterval = null;
 let playerScores = new Map();
 let currentAnswers = new Set();
+// NEW: Track which players answered correctly for the current question
+let currentCorrectAnswers = new Set();
 
 // NEW: Track the current phase of the game: "lobby" | "question" | "leaderboard" | "over"
 let phase = "lobby";
@@ -163,6 +165,8 @@ wss.on("connection", (ws, req) => {
                     if (player) {
                         console.log(`${player.name} answered correctly!`);
                         playerScores.set(ws.playerId, (playerScores.get(ws.playerId) || 0) + 1);
+                        // NEW: Record that this player answered correctly for this round
+                        currentCorrectAnswers.add(ws.playerId);
                     }
                 }
 
@@ -250,7 +254,8 @@ function sendCurrentState(ws) {
             scores: board,
             correctIndexes: currentQuestionData ? currentQuestionData.correctIndexes : [],
             correctAnswers: correctAnswersText,
-            originalOptions: originalOptions
+            originalOptions: originalOptions,
+            currentQuestion: currentQuestionData.question
         }));
     } else if (phase === "over") {
         const finalBoard = Array.from(players.values()).map(player => ({
@@ -330,12 +335,14 @@ function serveNextQuestion() {
         return;
     }
 
-    // Choose a random question from the list
+    // Reset answer tracking for the new question
+    currentAnswers = new Set();
+    currentCorrectAnswers = new Set(); // NEW: Reset correct answer tracking
+    questionEnded = false;
+
+    // Choose a random question from the list (do not remove it immediately)
     const randomIndex = Math.floor(Math.random() * questions.length);
     const selectedQuestion = questions[randomIndex];
-
-    // Remove selected question from the pool (if you don't want repeats)
-    questions.splice(randomIndex, 1);
 
     // Shuffle options and update correct indexes accordingly.
     const originalOptions = selectedQuestion.options.slice();
@@ -359,9 +366,6 @@ function serveNextQuestion() {
         image: selectedQuestion.image || null
     };
 
-    // Reset tracking for the new question
-    currentAnswers = new Set();
-    questionEnded = false;
     phase = "question";
 
     console.log(`Serving random question: ${currentQuestionData.question}`);
@@ -432,10 +436,13 @@ function showLeaderboard(correctIndexes) {
         originalOptions: originalOptions
     });
 
-    // Optionally reset scores every 10 questions
-    if (currentQuestionData && currentQuestionData.id && currentQuestionData.id % 10 === 0) {
-        console.log("Resetting leaderboard after 10 questions.");
-        playerScores.clear();
+    // NEW: If every connected player answered correctly, remove the question from the pool.
+    if (currentCorrectAnswers.size === players.size) {
+        console.log("Every player answered correctly. Removing question from pool.");
+        const index = questions.findIndex(q => q.question === currentQuestionData.question);
+        if (index !== -1) {
+            questions.splice(index, 1);
+        }
     }
 }
 

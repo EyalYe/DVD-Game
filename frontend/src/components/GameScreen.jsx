@@ -53,6 +53,7 @@ const GamePanel = () => {
   // Leaderboard data (phase = LEADERBOARD or OVER)
   const [leaderboard, setLeaderboard] = useState([]);
   const [correctAnswers, setCorrectAnswers] = useState([]);
+  const currentQuestionDisplay = currentQuestion ? `Question: ${currentQuestion}` : "";
 
   // Flash color state for answer feedback ("green", "red", or null)
   const [flashColor, setFlashColor] = useState(null);
@@ -406,7 +407,17 @@ const GamePanel = () => {
                 <li key={entry.id}>{entry.id}: {entry.score}</li>
               ))}
             </ul>
-            <h4>Correct Answer: {correctAnswers.join(", ")}</h4>
+            <h4>{currentQuestionDisplay}</h4>
+            {correctAnswers.length > 0 && (
+              <div>
+                <h4>Correct Answers:</h4>
+                <ul>
+                  {correctAnswers.map((ans, idx) => (
+                    <li key={idx}>{ans}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {isLeader && (
               <button onClick={continueToNext}>
                 Continue
