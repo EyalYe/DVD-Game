@@ -165,7 +165,7 @@ wss.on("connection", (ws, req) => {
                     if (player) {
                         console.log(`${player.name} answered correctly!`);
                         playerScores.set(ws.playerId, (playerScores.get(ws.playerId) || 0) + 1);
-                        // NEW: Record that this player answered correctly for this round
+                        // Record that this player answered correctly for this round
                         currentCorrectAnswers.add(ws.playerId);
                     }
                 }
@@ -176,6 +176,13 @@ wss.on("connection", (ws, req) => {
                     correct: isCorrect,
                     score: updatedScore
                 }));
+
+                // NEW: Broadcast current progress: which players have answered and total players
+                broadcast({
+                    type: "questionProgress",
+                    answered: Array.from(currentAnswers),
+                    totalPlayers: players.size
+                });
 
                 if (currentAnswers.size === players.size && !questionEnded) {
                     console.log("All players answered early, showing leaderboard.");
@@ -236,7 +243,8 @@ function sendCurrentState(ws) {
             question: currentQuestionData.question,
             options: currentQuestionData.options,
             isMultipleChoice: currentQuestionData.isMultipleChoice,
-            image: currentQuestionData.image || null
+            image: currentQuestionData.image || null,
+            questionsLeft: questions.length // NEW: number of questions left
         }));
     } else if (phase === "leaderboard") {
         const board = Array.from(players.values()).map(player => ({
@@ -255,7 +263,6 @@ function sendCurrentState(ws) {
             correctIndexes: currentQuestionData ? currentQuestionData.correctIndexes : [],
             correctAnswers: correctAnswersText,
             originalOptions: originalOptions,
-            // NEW: Send the current question along with the leaderboard
             currentQuestion: currentQuestionData ? currentQuestionData.question : null
         }));
     } else if (phase === "over") {
@@ -338,7 +345,7 @@ function serveNextQuestion() {
 
     // Reset answer tracking for the new question
     currentAnswers = new Set();
-    currentCorrectAnswers = new Set(); // NEW: Reset correct answer tracking
+    currentCorrectAnswers = new Set(); // Reset correct answer tracking
     questionEnded = false;
 
     // Choose a random question from the list (do not remove it immediately)
@@ -376,7 +383,8 @@ function serveNextQuestion() {
         question: currentQuestionData.question,
         options: currentQuestionData.options,
         isMultipleChoice: currentQuestionData.isMultipleChoice,
-        image: currentQuestionData.image // Relative URL as stored in DB
+        image: currentQuestionData.image,
+        questionsLeft: questions.length // NEW: include how many questions remain
     });
 
     // Time updates: broadcast a "timeUpdate" every 10% of questionTimeLimit seconds
@@ -435,11 +443,10 @@ function showLeaderboard(correctIndexes) {
         correctIndexes: correctIndexes,
         correctAnswers: correctAnswersText,
         originalOptions: originalOptions,
-        // NEW: Send the current question along with the leaderboard
         currentQuestion: currentQuestionData ? currentQuestionData.question : null
     });
 
-    // NEW: If every connected player answered correctly, remove the question from the pool.
+    // If every connected player answered correctly, remove the question from the pool.
     if (currentCorrectAnswers.size === players.size) {
         console.log("Every player answered correctly. Removing question from pool.");
         const index = questions.findIndex(q => q.question === currentQuestionData.question);
